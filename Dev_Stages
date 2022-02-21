@@ -1,0 +1,184 @@
+use role accountadmin;
+call SYSTEM$GET_PRIVATELINK_CONFIG() ;
+SELECT  SYSTEM$WHITELIST_PRIVATELINK();
+
+-- https://docs.snowflake.com/en/user-guide/data-load-azure-config.html
+-- Execute this as Account Admin
+use role sysadmin;
+CREATE DATABASE USLBM COMMENT = 'USLBM Database';
+use schema public;
+
+use role accountadmin;
+
+drop storage integration azureuslbm_int;
+
+create or replace storage integration azureuslbm_int
+	  type = external_stage
+	  storage_provider = azure
+	  enabled = true
+	  azure_tenant_id = '2fdfac55-d106-4200-a60b-9ea11706fa32'
+      storage_allowed_locations = ('azure://saentsysuse2edm.blob.core.windows.net/product/','azure://saentsysuse2edm.blob.core.windows.net/customer/',
+                                   'azure://saentsysuse2edm.blob.core.windows.net/data/','azure://saentsysuse2edm.blob.core.windows.net/adhoc/');
+
+desc storage integration azureuslbm_int ;
+-- AZURE_CONSENT_URL = https://login.microsoftonline.com/2fdfac55-d106-4200-a60b-9ea11706fa32/oauth2/authorize?client_id=1687985a-c403-417b-95ee-93878ecb4454&response_type=code
+--AZURE_MULTI_TENANT_APP_NAME = SnowflakePACInt1110_1641321365436
+
+-- Incident 243429 created for Bhanu to register above AZURE_CONSENT_URL in USLBM Azure
+-- Add SnowflakePACInt1110 in IAM Role Assignment for storage account - storage blob data contributor role
+
+
+call SYSTEM$GET_PRIVATELINK_CONFIG() ;
+--{"privatelink-account-name":"ar60548.east-us-2.privatelink",
+--"privatelink-account-url":"ar60548.east-us-2.privatelink.snowflakecomputing.com",
+--"privatelink-pls-id":"sf-pvlinksvc-azeastus2.cf82bce2-be9d-4dc6-92ee-3de5fb04d191.eastus2.azure.privatelinkservice",
+--"regionless-privatelink-account-url":"uvblwqf-ue69104.privatelink.snowflakecomputing.com",
+--"privatelink_ocsp-url":"ocsp.ar60548.east-us-2.privatelink.snowflakecomputing.com",
+--"privatelink-connection-urls":"[]"}
+call SYSTEM$GET_SNOWFLAKE_PLATFORM_INFO();
+-- Execute below to add snowflake subnets
+--az login
+--az account set --subscription "US LBM Enterprise Systems"
+--az storage account network-rule add --account-name saentsysuse2edm --resource-group "rg-entsys-dev-edm" --subnet "/subscriptions/ae0c1e4e-d49e-4115-b3ba-888d77ea97a3/resourceGroups/azure-prod/providers/Microsoft.Network/virtualNetworks/azure-prod/subnets/xp"
+--az storage account network-rule add --account-name saentsysuse2edm --resource-group "rg-entsys-dev-edm" --subnet "/subscriptions/ae0c1e4e-d49e-4115-b3ba-888d77ea97a3/resourceGroups/azure-prod/providers/Microsoft.Network/virtualNetworks/azure-prod/subnets/gs"
+--az storage account network-rule add --account-name saentsysuse2edm --resource-group "rg-entsys-dev-edm" --subnet "/subscriptions/37265438-aa4f-49f6-adc4-46271ae19193/resourceGroups/deployment-infra-rg2/providers/Microsoft.Network/virtualNetworks/deployment-vnet2/subnets/xp"
+--az storage account network-rule add --account-name saentsysuse2edm --resource-group "rg-entsys-dev-edm" --subnet "/subscriptions/37265438-aa4f-49f6-adc4-46271ae19193/resourceGroups/deployment-infra-rg2/providers/Microsoft.Network/virtualNetworks/deployment-vnet2/subnets/gs"
+--az storage account network-rule add --account-name saentsysuse2edm --resource-group "rg-entsys-dev-edm" --subnet "/subscriptions/63c9e19b-5cf1-4dcf-ace5-bf0f416f2ff7/resourceGroups/deployment-infra-rg3/providers/Microsoft.Network/virtualNetworks/deployment-vnet3/subnets/xp"
+--az storage account network-rule add --account-name saentsysuse2edm --resource-group "rg-entsys-dev-edm" --subnet "/subscriptions/63c9e19b-5cf1-4dcf-ace5-bf0f416f2ff7/resourceGroups/deployment-infra-rg3/providers/Microsoft.Network/virtualNetworks/deployment-vnet3/subnets/gs"
+
+SELECT SYSTEM$WHITELIST();
+
+use role accountadmin;
+grant create stage on schema public to role sysadmin;
+
+grant usage on integration azureuslbm_int to role sysadmin;
+
+use role sysadmin;
+
+use schema USLBM.public;
+
+create or replace file format CSV type = 'csv' field_delimiter = '|' error_on_column_count_mismatch=false;
+
+create or replace stage azureuslbm_customer_stage
+  storage_integration = azureuslbm_int
+  url = 'azure://saentsysuse2edm.blob.core.windows.net/customer/'
+  file_format = CSV ;
+
+create or replace stage azureuslbm_product_stage
+  storage_integration = azureuslbm_int
+  url = 'azure://saentsysuse2edm.blob.core.windows.net/product/'
+  file_format = CSV ;
+
+grant usage on stage  azureuslbm_product_stage to role accountadmin;
+
+use role sysadmin;
+create or replace stage azureuslbm_data_catalyst_stage
+  storage_integration = azureuslbm_int
+  url = 'azure://saentsysuse2edm.blob.core.windows.net/data/catalyst/';
+  --file_format = CSV ;
+create or replace stage azureuslbm_data_bistrack_stage
+  storage_integration = azureuslbm_int
+  url = 'azure://saentsysuse2edm.blob.core.windows.net/data/bistrack/';
+create or replace stage azureuslbm_data_progress_stage
+  storage_integration = azureuslbm_int
+  url = 'azure://saentsysuse2edm.blob.core.windows.net/data/progress/';
+create or replace stage azureuslbm_data_ecspro_stage
+  storage_integration = azureuslbm_int
+  url = 'azure://saentsysuse2edm.blob.core.windows.net/data/ecspro/';
+create or replace stage azureuslbm_data_ponderosa_stage
+  storage_integration = azureuslbm_int
+  url = 'azure://saentsysuse2edm.blob.core.windows.net/data/ponderosa/';
+create or replace stage azureuslbm_data_spruce_stage
+  storage_integration = azureuslbm_int
+  url = 'azure://saentsysuse2edm.blob.core.windows.net/data/spruce/';
+
+
+use role sysadmin;
+
+create or replace stage azureuslbm_data_adhoc_stage
+  storage_integration = azureuslbm_int
+  url = 'azure://saentsysuse2edm.blob.core.windows.net/adhoc/';
+
+
+
+list  @azureuslbm_product_stage pattern = '.*PRODUCTKIT.*.csv'; 
+list  @azureuslbm_customer_stage ;
+list  @azureuslbm_data_bistrack_stage ;
+list  @azureuslbm_data_catalyst_stage ;
+
+list  @azureuslbm_product_stage pattern = '.*PRODUCTKIT_FG.*.csv'; 
+
+list  @azureuslbm_product_stage pattern = '.*PERRULE_OH.csv'; 
+
+use role sysadmin;
+CREATE or replace TABLE ProductKit(
+ProductID integer,
+DocumentDescription varchar(255) ,
+TotalSellPrice double ,
+MinSellPrice double ,
+MaxSellPrice double ,
+BranchID integer ,
+CustomerID integer ,
+CustomerAddressID integer ,
+DocumentPresentation integer ,
+Manufactured boolean ,
+ManufacturedProductID integer ,
+SetDescriptionFromLinesShortDescriptions boolean ,
+AlwaysUseSellPriceOfFinishedItem boolean ,
+PromptForFinishedProduct boolean ,
+CombineManKitsonWO boolean ,
+Purchased boolean ,
+PurchaseProductID integer ,
+FractionalMultiplierOption integer)  ;
+
+copy into ProductKit from @azureuslbm_product_stage pattern = '.*PRODUCTKIT_FG.*.csv' ; 
+
+
+select * from ProductKit;
+
+
+list  @azureuslbm_customer_stage;
+use role accountadmin;
+select system$get_snowflake_platform_info();
+
+truncate ProductKit;
+
+use role sysadmin;
+CREATE or replace TABLE ProductKit(
+ProductID integer,
+DocumentDescription varchar(255) ,
+TotalSellPrice double ,
+MinSellPrice double ,
+MaxSellPrice double ,
+BranchID integer ,
+CustomerID integer ,
+CustomerAddressID integer ,
+DocumentPresentation integer ,
+Manufactured boolean ,
+ManufacturedProductID integer ,
+SetDescriptionFromLinesShortDescriptions boolean ,
+AlwaysUseSellPriceOfFinishedItem boolean ,
+PromptForFinishedProduct boolean ,
+CombineManKitsonWO boolean ,
+Purchased boolean ,
+PurchaseProductID integer ,
+FractionalMultiplierOption integer)  ;
+
+copy into ProductKit
+  from @azureuslbm_stage
+  pattern='.*PRODUCTKIT.*.csv'; error_on_column_count_mismatch=false;
+  
+list  @azureuslbm_stage;
+list @my_csv_stage/analysis/ pattern='.*data_0.*';
+
+Select * from  @azureuslbm_stage;
+
+describe stage azureuslbm_stage;
+
+
+ls @~;
+
+use role accountadmin;
+select system$get_snowflake_platform_info();
+--az login
+--az account set --subscription "US LBM Enterprise Systems"
